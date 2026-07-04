@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "conduit"
+version = "0.1.0"
+description = "Event-Driven ML Pipeline Orchestrator"
+requires-python = ">=3.11"
+
+[project.scripts]
+conduit = "conduit_api.cli:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

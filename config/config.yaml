@@ -1,0 +1,43 @@
+server:
+  host: "0.0.0.0"
+  port: 8004
+  log_level: "info"
+
+redis:
+  url: "redis://localhost:6379"
+  stream_key: "conduit:tasks"
+  dlq_key: "conduit:dlq"
+  consumer_group: "conduit:workers"
+  consumer_name: "worker-1"
+  batch_size: 10
+  block_ms: 1000
+  visibility_timeout_seconds: 300
+
+sqlite:
+  db_path: "conduit.db"
+
+workers:
+  concurrency: 4
+  task_timeout_seconds: 3600
+
+resources:
+  cpu_limit_pct: 80.0
+  memory_limit_gb: 16.0
+  check_enabled: true
+
+retry:
+  base_delay_seconds: 1.0
+  max_delay_seconds: 300.0
+  jitter: true
+  backoff_multiplier: 2.0
+
+scheduler:
+  timezone: "UTC"
+
+webhooks:
+  enabled: false
+  url: null
+  timeout_seconds: 10
+
+prometheus:
+  enabled: true
