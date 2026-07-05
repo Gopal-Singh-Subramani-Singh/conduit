@@ -18,39 +18,26 @@ ML pipelines have hard requirements: task ordering, retries on transient failure
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────┐
-│  Client (CLI / REST / SDK)              │
-└──────────────────┬──────────────────────┘
-                   │
-┌──────────────────▼──────────────────────┐
-│  PipelineEngine                         │
-│  - DAG registration and validation      │
-│  - Kahn's algorithm (topological sort)  │
-│  - Cycle detection                      │
-│  - Parallel dispatch                    │
-└──────┬───────────────────────┬──────────┘
-       │                       │
-┌──────▼──────┐       ┌────────▼────────┐
-│ Redis Stream│       │  SQLite Store   │
-│ (task queue │       │  (run history,  │
-│  consumer   │       │   task state)   │
-│  groups)    │       └─────────────────┘
-└──────┬──────┘
-       │
-┌──────▼──────────────────────────────────┐
-│  WorkerPool  (asyncio, configurable)    │
-│  ├── ResourceQuotaManager (psutil)      │
-│  │     └── cap CPU/memory per pipeline  │
-│  ├── RetryWithBackoff                   │
-│  │     └── exponential + jitter        │
-│  └── DeadLetterQueue                   │
-│        └── exhausted tasks → forensics │
-└─────────────────────────────────────────┘
-         │
-┌────────▼────────────────────────────────┐
-│  Prometheus (10 metrics) + Grafana      │
-└─────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    CLI([CLI / REST API / SDK]) --> PE[PipelineEngine\nKahn's topological sort\ncycle detection · parallel dispatch]
+
+    PE --> RQ[(Redis Streams\ntask queue · consumer groups\nat-least-once delivery)]
+    PE --> SS[(SQLite Store\nrun history · task state)]
+
+    RQ --> WP[WorkerPool\nasyncio · configurable concurrency]
+    WP --> RQM[ResourceQuotaManager\npsutil CPU + memory caps]
+    WP --> RWB[RetryWithBackoff\nexponential + jitter]
+    WP --> DLQ[DeadLetterQueue\nexhausted tasks + forensics]
+
+    DLQ -->|replay| RQ
+
+    WP --> OBS[Prometheus · 10 metrics\n──► Grafana Dashboard]
+
+    style CLI fill:#4A90D9,color:#fff
+    style PE fill:#7B68EE,color:#fff
+    style OBS fill:#2E8B57,color:#fff
+    style DLQ fill:#C0392B,color:#fff
 ```
 
 ---
