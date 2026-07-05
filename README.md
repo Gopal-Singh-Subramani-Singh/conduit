@@ -1,18 +1,48 @@
-# Conduit — Event-Driven ML Pipeline Orchestrator
+<p align="center">
+  <img src="docs/conduit.png" alt="Conduit Logo" width="180">
+</p>
 
-Lightweight DAG-based pipeline orchestrator using Redis Streams. Airflow without the weight. Built for Apple Silicon. $0 budget. Fully local.
+<h1 align="center">Conduit</h1>
+
+<p align="center">
+  <strong>Event-Driven ML Pipeline Orchestrator</strong>
+</p>
+
+<p align="center">
+  Lightweight DAG-based pipeline orchestration using Redis Streams.
+  Airflow-style workflow execution without the operational overhead.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11-blue" alt="Python">
+  <img src="https://img.shields.io/badge/FastAPI-REST%20API-green" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Redis-Streams-red" alt="Redis Streams">
+  <img src="https://img.shields.io/badge/Orchestration-DAGs-purple" alt="DAG Orchestration">
+  <img src="https://img.shields.io/badge/Local--First-Apple%20Silicon-lightgrey" alt="Local First">
+</p>
 
 ---
 
-## What it does
+## Overview
 
-Conduit lets you define ML workflows as Python DAGs using a decorator DSL, then executes them reliably using a Redis Streams task queue. It handles dependency resolution, parallel dispatch, retries with backoff, resource quotas, and dead letter queues — giving you Airflow-style orchestration without the operational overhead.
+**Conduit** is a local-first ML pipeline orchestrator built around Python DAGs and Redis Streams. It lets you define workflows with a decorator-based DSL, execute tasks in dependency order, retry failed work, enforce resource quotas, and inspect failures through a dead letter queue.
+
+The goal is to demonstrate the core engineering ideas behind production orchestrators such as Airflow, Prefect, and Dagster, but with a lightweight architecture that runs fully locally.
 
 ---
 
-## Why it matters
+## Why It Matters
 
-ML pipelines have hard requirements: task ordering, retries on transient failures, forensics on permanent failures, and resource guards to prevent OOM. Conduit implements these patterns from scratch using Redis Streams as the backbone — the same event-driven architecture used in production streaming systems. It's a practical demonstration of DAG scheduling and at-least-once delivery semantics.
+ML pipelines need more than simple scripts. Production workflows require:
+
+* task dependency resolution
+* retry handling for transient failures
+* dead letter queues for permanent failures
+* resource guards to prevent runaway jobs
+* observability across DAG runs and task states
+* repeatable execution from APIs, CLIs, or scheduled triggers
+
+Conduit implements these patterns from scratch using Redis Streams as the event backbone and SQLite as the run-state store.
 
 ---
 
@@ -32,7 +62,7 @@ flowchart TD
 
     DLQ -->|replay| RQ
 
-    WP --> OBS[Prometheus · 10 metrics\n──► Grafana Dashboard]
+    WP --> OBS[Prometheus · 10 metrics\nGrafana dashboard]
 
     style CLI fill:#4A90D9,color:#fff
     style PE fill:#7B68EE,color:#fff
@@ -44,26 +74,37 @@ flowchart TD
 
 ## Features
 
-- **Python DAG DSL**: `@conduit.task` and `@conduit.dag` decorators; task graph built from Python functions
-- **Dependency resolver**: Kahn's algorithm — topological sort with cycle detection
-- **Parallel dispatch**: independent tasks in a stage run concurrently
-- **Redis Streams task queue**: at-least-once delivery, consumer groups, acknowledgement
-- **Retries with exponential backoff + jitter**: configurable per-task max retries and delay
-- **Dead letter queue (DLQ)**: exhausted tasks parked with full forensics — exception, stack trace, attempt count
-- **DLQ replay**: re-submit a failed task via CLI or REST without rerunning the full DAG
-- **Resource quota manager**: psutil-based CPU and memory caps prevent OOM on concurrent pipelines
-- **APScheduler cron triggers**: schedule DAG runs on a cron expression
-- **Dynamic DAGs**: task graph can be generated at runtime
-- **FastAPI REST API**: trigger runs, check status, inspect DLQ
-- **Typer CLI**: `conduit run`, `conduit status`, `conduit dlq`
-- **10 Prometheus metrics**: task throughput, latency, retry counts, DLQ depth, worker utilization
-- **Grafana dashboard**: pre-configured dashboard included
+* **Python DAG DSL** with `@conduit.task` and `@conduit.dag`
+* **Dependency resolver** using Kahn's topological sort with cycle detection
+* **Parallel task dispatch** for independent tasks within the same stage
+* **Redis Streams queue** with consumer groups and acknowledgement
+* **At-least-once delivery semantics** for reliable task execution
+* **Retries with exponential backoff and jitter**
+* **Dead letter queue** with exception details, stack traces, attempts, and task metadata
+* **DLQ replay** through CLI or REST API
+* **Resource quota manager** using psutil-based CPU and memory caps
+* **Cron scheduling** through APScheduler
+* **Dynamic DAG support** for runtime-generated task graphs
+* **FastAPI REST API** for triggering and inspecting DAG runs
+* **Typer CLI** for local workflow control
+* **Prometheus metrics** for tasks, runs, retries, DLQ depth, and worker utilization
+* **Grafana dashboard** for monitoring pipeline execution
 
 ---
 
 ## Tech Stack
 
-Python · FastAPI · Redis Streams · SQLite · APScheduler · Prometheus · Grafana · Docker · asyncio · Typer
+| Area       | Tools                  |
+| ---------- | ---------------------- |
+| DAG Engine | Python, asyncio        |
+| API        | FastAPI                |
+| Queue      | Redis Streams          |
+| State      | SQLite                 |
+| Scheduling | APScheduler            |
+| CLI        | Typer                  |
+| Metrics    | Prometheus             |
+| Dashboard  | Grafana                |
+| Runtime    | Docker, Docker Compose |
 
 ---
 
@@ -79,91 +120,71 @@ pip install -r requirements.txt
 ### 2. Start infrastructure
 
 ```bash
-cd conduit
 docker compose up redis prometheus grafana -d
 ```
 
 ### 3. Start Conduit
 
 ```bash
-cd conduit
 uvicorn conduit_api.main:app --port 8004 --reload
 ```
 
 ### 4. Run tests
 
 ```bash
-cd conduit
 pytest tests/ -v
 ```
 
 ### 5. Run the demo pipeline
 
 ```bash
-cd conduit
 python demo/ml_training_pipeline.py
 ```
 
-### Full Docker stack
+### 6. Run the full Docker stack
 
 ```bash
-cd conduit
 docker compose up --build
-# Prometheus: http://localhost:9090
-# Grafana:    http://localhost:3000  (admin / conduit)
+```
+
+Prometheus:
+
+```text
+http://localhost:9090
+```
+
+Grafana:
+
+```text
+http://localhost:3000
+```
+
+Default login:
+
+```text
+admin / conduit
 ```
 
 ---
 
-## API / CLI Usage
-
-### CLI
-
-```bash
-conduit dags                    # list registered DAGs
-conduit run my_dag              # trigger a DAG run
-conduit run my_dag --params '{"key": "val"}'  # with params
-conduit status <run_id>         # get run status
-conduit list                    # list recent runs
-conduit dlq                     # inspect dead letter queue
-conduit dlq replay <task_run_id>  # replay a failed task
-```
-
-### REST API
-
-```
-POST   /runs                          Trigger a DAG run
-GET    /runs/{id}                     Get run status and task states
-GET    /runs                          List runs (paginated)
-DELETE /runs/{id}                     Cancel a run
-GET    /dags                          List registered DAGs
-GET    /dlq                           List DLQ entries
-POST   /dlq/{task_run_id}/replay      Replay a failed task
-GET    /health                        Health check
-GET    /metrics                       Prometheus metrics
-```
-
-### DAG definition example
+## DAG Definition Example
 
 ```python
 import conduit
 
 @conduit.task(retries=3, retry_delay=5.0)
 def fetch_data(run_id: str) -> dict:
-    # fetch training data
     return {"rows": 1000}
 
 @conduit.task(retries=2)
 def preprocess(data: dict) -> dict:
-    # clean and transform
     return {"features": data["rows"]}
 
 @conduit.task
 def train_model(features: dict) -> str:
-    # train and return model path
     return "/models/v1.pkl"
 
-@conduit.dag(schedule="0 2 * * *")   # run at 2am daily
+@conduit.dag(schedule="0 2 * * *")
 def ml_training_pipeline():
     data = fetch_data()
     features = preprocess(data)
@@ -172,65 +193,129 @@ def ml_training_pipeline():
 
 ---
 
-## Tests
+## CLI Usage
 
 ```bash
-# Run all tests (no Redis needed)
-pytest tests/ -v
-
-# Run specific test module
-pytest tests/test_pipeline_engine.py -v
-
-# With coverage
-pytest tests/ -v --cov=conduit_core --cov=conduit_api
+conduit dags
+conduit run my_dag
+conduit run my_dag --params '{"key": "val"}'
+conduit status <run_id>
+conduit list
+conduit dlq
+conduit dlq replay <task_run_id>
 ```
 
-30+ tests covering: DAG registration, topological sort, cycle detection, retry logic, DLQ, resource quotas, REST API endpoints.
+---
+
+## REST API
+
+| Method | Endpoint                    | Description                    |
+| ------ | --------------------------- | ------------------------------ |
+| POST   | `/runs`                     | Trigger a DAG run              |
+| GET    | `/runs/{id}`                | Get run status and task states |
+| GET    | `/runs`                     | List recent runs               |
+| DELETE | `/runs/{id}`                | Cancel a run                   |
+| GET    | `/dags`                     | List registered DAGs           |
+| GET    | `/dlq`                      | List dead letter queue entries |
+| POST   | `/dlq/{task_run_id}/replay` | Replay a failed task           |
+| GET    | `/health`                   | Health check                   |
+| GET    | `/metrics`                  | Prometheus metrics             |
 
 ---
 
 ## Observability
 
-**Prometheus metrics** (available at `/metrics`):
+Conduit exposes Prometheus metrics at:
 
-- `conduit_tasks_submitted_total{dag_id, task_id}` — total tasks dispatched
-- `conduit_tasks_completed_total{dag_id, task_id, status}` — completions by status
-- `conduit_task_duration_seconds{dag_id, task_id}` — task execution time histogram
-- `conduit_retries_total{dag_id, task_id}` — retry events
-- `conduit_dlq_depth` — current dead letter queue size
-- `conduit_workers_active` — active worker count
-- `conduit_runs_total{dag_id, status}` — DAG run counts
-- `conduit_run_duration_seconds{dag_id}` — end-to-end pipeline duration
-- `conduit_queue_depth` — pending Redis Streams queue depth
-- `conduit_resource_quota_rejections_total` — tasks rejected by quota manager
+```text
+http://localhost:8004/metrics
+```
 
-**Grafana**: Dashboard included; import via `docker compose up` or from `config/`.
+### Metrics
+
+| Metric                                                   | Description                       |
+| -------------------------------------------------------- | --------------------------------- |
+| `conduit_tasks_submitted_total{dag_id, task_id}`         | Total tasks dispatched            |
+| `conduit_tasks_completed_total{dag_id, task_id, status}` | Task completions by status        |
+| `conduit_task_duration_seconds{dag_id, task_id}`         | Task execution latency            |
+| `conduit_retries_total{dag_id, task_id}`                 | Retry events                      |
+| `conduit_dlq_depth`                                      | Current dead letter queue size    |
+| `conduit_workers_active`                                 | Active worker count               |
+| `conduit_runs_total{dag_id, status}`                     | DAG run counts                    |
+| `conduit_run_duration_seconds{dag_id}`                   | End-to-end pipeline duration      |
+| `conduit_queue_depth`                                    | Pending Redis Streams queue depth |
+| `conduit_resource_quota_rejections_total`                | Tasks rejected by quota manager   |
+
+---
+
+## Screenshots
+
+![](docs/image55.png)
+
+![](docs/image56.png)
+
+![](docs/image57.png)
+
+![](docs/image58.png)
+
+![](docs/image59.png)
+
+![](docs/image60.png)
+
+![](docs/image61.png)
+
+---
+
+## Tests
+
+```bash
+pytest tests/ -v
+```
+
+Run a specific test module:
+
+```bash
+pytest tests/test_pipeline_engine.py -v
+```
+
+With coverage:
+
+```bash
+pytest tests/ -v --cov=conduit_core --cov=conduit_api
+```
+
+The test suite covers DAG registration, topological sorting, cycle detection, retry logic, DLQ handling, resource quotas, and REST API endpoints.
 
 ---
 
 ## Demo
 
 ```bash
-# Navigate to conduit directory
-cd conduit
-
-# Run the ML training pipeline demo
 python demo/ml_training_pipeline.py
+```
 
-# Expected output:
-# [conduit] DAG 'ml_training_pipeline' submitted — run_id: abc123
-# [conduit] Task 'fetch_data' → RUNNING
-# [conduit] Task 'fetch_data' → SUCCESS (1.2s)
-# [conduit] Task 'preprocess' → RUNNING
-# [conduit] Task 'preprocess' → SUCCESS (0.4s)
-# [conduit] Task 'train_model' → RUNNING
-# [conduit] Task 'train_model' → SUCCESS (3.1s)
-# [conduit] Pipeline completed in 4.7s
+Expected flow:
 
-# Inspect DLQ (if any tasks failed)
+```text
+[conduit] DAG 'ml_training_pipeline' submitted — run_id: abc123
+[conduit] Task 'fetch_data' → RUNNING
+[conduit] Task 'fetch_data' → SUCCESS
+[conduit] Task 'preprocess' → RUNNING
+[conduit] Task 'preprocess' → SUCCESS
+[conduit] Task 'train_model' → RUNNING
+[conduit] Task 'train_model' → SUCCESS
+[conduit] Pipeline completed
+```
+
+Inspect DLQ:
+
+```bash
 conduit dlq
+```
 
-# Replay a failed task
+Replay failed task:
+
+```bash
 conduit dlq replay <task_run_id>
 ```
 
@@ -238,33 +323,21 @@ conduit dlq replay <task_run_id>
 
 ## Known Limitations
 
-- **Local resource quotas only**: The ResourceQuotaManager uses psutil for CPU and memory limits. These are process-level approximations — not cgroup-based enforcement. In a real cluster, use Kubernetes resource limits.
-- **Single-node only**: Conduit runs on one machine. Workers are asyncio coroutines, not distributed processes. It is not a distributed orchestrator like Airflow or Prefect.
-- **No DAG versioning**: Once a DAG is registered, there is no version history. Changing a DAG definition overwrites the previous version.
-- **Redis required**: Redis Streams is the task queue backbone. Without Redis, Conduit cannot start.
-- **At-least-once delivery**: Conduit guarantees at-least-once task execution. Tasks must be idempotent if they may be retried after partial completion.
-- **No UI dashboard**: Conduit provides a REST API and CLI but no web dashboard (unlike Airflow). Monitoring is via Grafana/Prometheus.
+* **Local resource quotas only**: CPU and memory caps use psutil and are process-level approximations.
+* **Single-node execution**: Workers are asyncio coroutines, not distributed physical workers.
+* **No DAG versioning**: Changing a DAG definition overwrites the previous version.
+* **Redis required**: Redis Streams is the task queue backbone.
+* **At-least-once delivery**: Tasks must be idempotent because retries may re-run partially completed work.
+* **No web dashboard**: Operational visibility is provided through REST, CLI, Prometheus, and Grafana.
 
 ---
 
 ## Future Work
 
-- Distributed workers (multi-machine worker pool via gRPC)
-- DAG versioning and rollback
-- Web dashboard for pipeline visualization
-- Per-task resource limits via Docker containers
-- Sensor tasks (external triggers: S3, webhooks, time windows)
-- DAG import from YAML config (no code required)
+* Multi-machine workers through gRPC
+* DAG versioning and rollback
+* Web dashboard for pipeline visualization
+* Per-task resource limits through Docker containers
+* Sensor tasks for S3, webhooks, and time-window triggers
+* YAML-based DAG import
 
----
-
-
-
-## Screenshots
-![](docs/image55.png)
-![](docs/image56.png)
-![](docs/image57.png)
-![](docs/image58.png)
-![](docs/image59.png)
-![](docs/image60.png)
-![](docs/image61.png)
