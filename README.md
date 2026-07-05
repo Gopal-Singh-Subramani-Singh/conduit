@@ -261,3 +261,12 @@ conduit dlq replay <task_run_id>
 ## Resume Bullet
 
 > Built an event-driven ML pipeline orchestrator with a Python DAG DSL, Redis Streams task queue, dependency-aware topological scheduling, exponential backoff retries, dead letter queues, and Prometheus-based execution monitoring.
+
+## Screenshots
+![](docs/image55.png)
+![](docs/image56.png)
+![](docs/image57.png)
+![](docs/image58.png)
+![](docs/image59.png)
+![](docs/image60.png)
+![](docs/image61.png)
